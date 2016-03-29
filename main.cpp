@@ -33,7 +33,7 @@ void get_root_nodes(QVector<int> parentNodes,QVector<int> *root_nodes);
 void get_terminal_nodes(QVector<vessel_node> vessels,QVector<int> parentNodes,QVector<int> *terminal_nodes);
 void get_segment_seeds(QVector<int> parentNodes,QVector<int> *segment_seeds);
 void calc_segment_area_vol(const vessel_node *node1, const vessel_node *node2, double *seg_vol, double *seg_lsa);
-
+void copy_vnode(vessel_node in, vessel_node *out);
 
 int main(int argc, char *argv[])
 {
@@ -83,16 +83,22 @@ int main(int argc, char *argv[])
       bool end = false;
       int node1_num = root_nodes[i];
       int node2_num = 0; //Value '0' should never be used - dummy init.
+      vessel_node node1,node2;
+      //If seed is a branch or terminal skip it
+      if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
+          end = true;
+        }
+      double vol=0.0;
+      double lsa = 0.0;
       while(!end) {
-          vessel_node node1 = vessel_block.vessels[node1_num];
+          copy_vnode(vessel_block.vessels[node1_num],&node1);
           node2_num = parent_nodes.indexOf(node1_num) + 1;
-          if( (branch_nodes.indexOf(node2_num) != -1) || (terminal_nodes.indexOf(node2_num) != -1) ){
+          if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
               end = true;
-              break;
+              continue;
             }
-          vessel_node node2 = vessel_block.vessels[node2_num];
+          copy_vnode(vessel_block.vessels[node2_num],&node2);
 
-          double vol, lsa;
           calc_segment_area_vol(&node1,&node2,&vol,&lsa);
 
           total_volume+=vol;
@@ -102,6 +108,9 @@ int main(int argc, char *argv[])
         }
       traversed_nodes.append(root_nodes[i]);
     }
+
+  qDebug() << "Total Volume of segments from root to branch:" << total_volume << " voxel cubic units";
+  qDebug() << "Total LSA of segments from root to branch:" << total_surface_area << "voxel square units";
 
   return EXIT_SUCCESS;
 }
@@ -115,6 +124,16 @@ QVector<int> get_children(QVector<int> parent_nodes,int branch_val){
       from = inx+1;
     }
   return children;
+}
+
+void copy_vnode(vessel_node in, vessel_node *out){
+  out->node_num = in.node_num;
+  out->parent = in.parent;
+  out->pos_x = in.pos_x;
+  out->pos_y = in.pos_y;
+  out->pos_z = in.pos_z;
+  out->radius = in.radius;
+  out->type = in.type;
 }
 
 double absdiff(double n1, double n2){
@@ -149,17 +168,19 @@ int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes){
       curr_val =  parentNodes[i];
       if(curr_val != -1) {
           curr_cnt = parentNodes.count(curr_val);
-          if(curr_cnt>4){
-              qDebug() << "The SWC file is corrupt. More than 2 children for single parent";
-              return -1;
-            }
+//          if(curr_cnt>4){
+//              qDebug() << "The SWC file is corrupt. More than 2 children for single parent";
+//              return -1;
+//            }
           if(curr_cnt>1) {
               branch_nodes->append(curr_val);
               parentNodes.replace(i,-1);
-              //I can make a loop to replace one by one
-              //but it should ot be necessary. >4 = error for now.
-              unsigned int j = parentNodes.indexOf(curr_val);
-              parentNodes.replace(j,-1);
+              if(curr_cnt > 2) {
+                  for(int j = curr_cnt -2;j >0; j--) {
+                      unsigned int jj = parentNodes.indexOf(curr_val);
+                      parentNodes.replace(jj,-1);
+                    }
+                }
               branch_count++;
             }
         }
