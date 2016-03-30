@@ -1,6 +1,7 @@
 #include <QString>
 #include <QDebug>
 #include <QFile>
+#include <QMap>
 
 #include <string>
 #include <iostream>
@@ -26,7 +27,7 @@ typedef struct{
 } VesselBlock;
 
 bool read_swc_file(VesselBlock *vessel_blocks,QString Path);
-int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes);
+int get_branches(QVector<int> parentNodes, QVector<int> *branch_nodes, QMap<int, QList<int> > *child_map);
 QVector<int> get_children(QVector<int> parent_nodes,int branch_val);
 double absdiff(double n1, double n2);
 void get_root_nodes(QVector<int> parentNodes,QVector<int> *root_nodes);
@@ -54,7 +55,8 @@ int main(int argc, char *argv[])
     parent_nodes.append(vessel_block.vessels[i].parent);
 
   QVector<int> branch_nodes;
-  int num_branches = get_branches(parent_nodes,&branch_nodes);
+  QMap<int, QList<int> > child_map;
+  int num_branches = get_branches(parent_nodes,&branch_nodes, &child_map);
   if(num_branches < 0) return EXIT_FAILURE;
 
   qDebug() << num_branches << "branches are there in this trace";
@@ -69,16 +71,14 @@ int main(int argc, char *argv[])
 
   QVector<int> terminal_nodes;
   get_terminal_nodes(vessel_block.vessels,parent_nodes,&terminal_nodes);
+  segment_seeds+=terminal_nodes;
 
   QVector<int> traversed_nodes;
 
-//  QVector<int>::iterator vec_iter;
-//  for(vec_iter = root_nodes.begin(); vec_iter != root_nodes.end();vec_iter++) {
-//      if(terminal_nodes.indexOf(vec_iter) != -1) root_nodes.remove(vec_iter);
-//    }
-
   double total_volume = 0.0;
   double total_surface_area = 0.0;
+  //FROM ROOTS TO ALL IMMEDIATE BRANCHES.
+  //THIS PART IGNORES TERMINAL-ROOTS
   for(int i=0; i < root_nodes.size();i++){
       bool end = false;
       int node1_num = root_nodes[i];
@@ -91,13 +91,13 @@ int main(int argc, char *argv[])
       double vol=0.0;
       double lsa = 0.0;
       while(!end) {
-          copy_vnode(vessel_block.vessels[node1_num],&node1);
+          copy_vnode(vessel_block.vessels[node1_num-1],&node1);
           node2_num = parent_nodes.indexOf(node1_num) + 1;
           if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
               end = true;
               continue;
             }
-          copy_vnode(vessel_block.vessels[node2_num],&node2);
+          copy_vnode(vessel_block.vessels[node2_num-1],&node2);
 
           calc_segment_area_vol(&node1,&node2,&vol,&lsa);
 
@@ -108,9 +108,47 @@ int main(int argc, char *argv[])
         }
       traversed_nodes.append(root_nodes[i]);
     }
-
   qDebug() << "Total Volume of segments from root to branch:" << total_volume << " voxel cubic units";
   qDebug() << "Total LSA of segments from root to branch:" << total_surface_area << "voxel square units";
+
+  //BRANCH TO BRANCH TRACING
+  foreach(int branch_node, branch_nodes){
+      QList<int> children = child_map.value(branch_node);
+      int node1_num=0,node2_num=0;
+      vessel_node node1,node2;
+      double vol=0.0;
+      double lsa = 0.0;
+      copy_vnode(vessel_block.vessels[branch_node-1],&node2);
+      //Node1 is a branch, cannot be a terminal (else you wont know its a branch)
+      foreach(int child_node, children){
+          bool end = false;
+          node1_num = child_node;
+          if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
+              copy_vnode(vessel_block.vessels[child_node-1],&node1);
+              calc_segment_area_vol(&node1,&node2,&vol,&lsa);
+              total_volume+=vol;
+              total_surface_area +=lsa;
+              end = true;
+              continue;
+            }
+          while(!end) {
+              copy_vnode(vessel_block.vessels[node1_num-1],&node1);
+              node2_num = parent_nodes.indexOf(node1_num) + 1;
+              copy_vnode(vessel_block.vessels[node2_num-1],&node2);
+              calc_segment_area_vol(&node1,&node2,&vol,&lsa);
+              total_volume+=vol;
+              total_surface_area +=lsa;
+              if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
+                  end = true;
+                  continue;
+                }
+              node1_num = node2_num;
+            }
+        }
+    }
+
+  qDebug() << "Total Volume of segments:" << total_volume << " voxel cubic units";
+  qDebug() << "Total LSA of segments:" << total_surface_area << "voxel square units";
 
   return EXIT_SUCCESS;
 }
@@ -161,26 +199,28 @@ void get_segment_seeds(QVector<int> parentNodes,QVector<int> *segment_seeds){
      }
 }
 
-int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes){
+int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes, QMap<int, QList<int> > *child_map){
   int curr_val,curr_cnt;
   int branch_count=0;
   for(int i=0;i<parentNodes.size();i++){
       curr_val =  parentNodes[i];
       if(curr_val != -1) {
           curr_cnt = parentNodes.count(curr_val);
-//          if(curr_cnt>4){
-//              qDebug() << "The SWC file is corrupt. More than 2 children for single parent";
-//              return -1;
-//            }
           if(curr_cnt>1) {
+              QList<int> child;
               branch_nodes->append(curr_val);
+              child.append(i+1);
               parentNodes.replace(i,-1);
               if(curr_cnt > 2) {
                   for(int j = curr_cnt -2;j >0; j--) {
                       unsigned int jj = parentNodes.indexOf(curr_val);
                       parentNodes.replace(jj,-1);
+                      child.append(jj+1);
                     }
                 }
+              child.append(parentNodes.indexOf(curr_val));
+              child_map->insert(curr_val,child);
+              child.clear();
               branch_count++;
             }
         }
@@ -222,7 +262,7 @@ bool read_swc_file(VesselBlock *vblock, QString inFileName) {
       vessel_node node;
       QString line = in.readLine();
       QStringList somelist = line.split(' ');
-      if(line[0] != '#'){
+      if( (line[0] != '#') && (!line.isEmpty())){
           //qDebug() << somelist;
           node.node_num = somelist[0].toInt();
           node.type = somelist[1].toInt();
@@ -233,13 +273,14 @@ bool read_swc_file(VesselBlock *vblock, QString inFileName) {
           node.parent = somelist[6].toInt();
           vblock->vessels.append(node);
          }
+      /* IGNORE COMMENTS
       else if(somelist.size() > 1){
           if(somelist[0] == "#XYZ"){
               vblock->x_dim = somelist[1].toInt();
               vblock->y_dim = somelist[2].toInt();
               vblock->z_dim = somelist[3].toInt();
             }
-        }
+        }*/
     }
   file.close();
   return true;
