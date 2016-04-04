@@ -262,15 +262,15 @@ int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes, QMap<int,
 //Calculate the surface area and volume between two points
 void calc_segment_stats(const vessel_node *node1, const vessel_node *node2, double *seg_vol, double *seg_lsa, double *seg_len){
   //Assume the vessel segment is a frustum of cone
-  double x1_sq = (node1->pos_x)*(node1->pos_x);
-  double y1_sq = (node1->pos_y)*(node1->pos_y);
-  double z1_sq = (node1->pos_z)*(node1->pos_z);
+  double x12 = absdiff((node1->pos_x),(node2->pos_x));
+  double y12 = absdiff((node1->pos_y),(node2->pos_y));
+  double z12 = absdiff((node1->pos_z),(node2->pos_z));
 
-  double x2_sq = (node2->pos_x)*(node2->pos_x);
-  double y2_sq = (node2->pos_y)*(node2->pos_y);
-  double z2_sq = (node2->pos_z)*(node2->pos_z);
+  double x12_sq = x12*x12;
+  double y12_sq = y12*y12;
+  double z12_sq = z12*z12;
 
-  double h = std::sqrt(absdiff(x1_sq,x2_sq)+(y1_sq,y2_sq)+(z1_sq,z2_sq));
+  double h = std::sqrt(x12_sq+y12_sq+z12_sq);
   double r1_sq = node1->radius*node1->radius;
   double r2_sq = node2->radius*node2->radius;
   double rdiff = absdiff(node1->radius,node2->radius);
