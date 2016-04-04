@@ -94,7 +94,6 @@ int main(int argc, char *argv[])
       double lsa = 0.0;
       double seg_len = 0.0;
       while(!end) {
-          num_segments++;
           copy_vnode(vessel_block.vessels[node1_num-1],&node1);
           node2_num = parent_nodes.indexOf(node1_num) + 1;
           if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
@@ -112,6 +111,7 @@ int main(int argc, char *argv[])
           if(seg_len < min_segment_length) min_segment_length = seg_len;
 
           node1_num = node2_num;
+          num_segments++;
         }
       traversed_nodes.append(root_nodes[i]);
     }
@@ -120,33 +120,32 @@ int main(int argc, char *argv[])
   qDebug() << "Total LSA of segments from root to branch:" << total_surface_area << "voxel square units";
 
   //BRANCH TO BRANCH TRACING
-  foreach(int branch_node, branch_nodes){
-      QList<int> children = child_map.value(branch_node);
+  foreach(int branch_node_num, branch_nodes){
+      QList<int> children = child_map.value(branch_node_num);
       int node1_num=0,node2_num=0;
-      vessel_node node1,node2;
+      vessel_node node1,node2,branch_node;
       double vol=0.0;
       double lsa = 0.0;
-      copy_vnode(vessel_block.vessels[branch_node-1],&node2);
+      copy_vnode(vessel_block.vessels[branch_node_num-1],&branch_node);
       //Node1 is a branch, cannot be a terminal (else you wont know its a branch)
       foreach(int child_node, children){
           bool end = false;
           double seg_len = 0.0;
           node1_num = child_node;
+          num_segments++;
+          copy_vnode(vessel_block.vessels[child_node-1],&node1);
+          calc_segment_stats(&node1,&branch_node,&vol,&lsa,&seg_len);
+          total_volume+=vol;
+          total_surface_area +=lsa;
+          total_segment_length += seg_len;
+          if(seg_len > max_segment_length) max_segment_length = seg_len;
+          if(seg_len < min_segment_length) min_segment_length = seg_len;
           if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
-              num_segments++;
-              copy_vnode(vessel_block.vessels[child_node-1],&node1);
-              calc_segment_stats(&node1,&node2,&vol,&lsa,&seg_len);
-              total_volume+=vol;
-              total_surface_area +=lsa;
-              total_segment_length += seg_len;
-              if(seg_len > max_segment_length) max_segment_length = seg_len;
-              if(seg_len < min_segment_length) min_segment_length = seg_len;
               end = true;
               continue;
             }
           while(!end) {
               num_segments++;
-              copy_vnode(vessel_block.vessels[node1_num-1],&node1);
               node2_num = parent_nodes.indexOf(node1_num) + 1;
               copy_vnode(vessel_block.vessels[node2_num-1],&node2);
               calc_segment_stats(&node1,&node2,&vol,&lsa,&seg_len);
@@ -160,6 +159,7 @@ int main(int argc, char *argv[])
                   continue;
                 }
               node1_num = node2_num;
+              copy_vnode(vessel_block.vessels[node1_num-1],&node1);
             }
         }
     }
