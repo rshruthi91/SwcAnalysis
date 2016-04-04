@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
   QVector<int> segment_seeds;
   segment_seeds = branch_nodes;
   get_segment_seeds(parent_nodes,&segment_seeds);
-  int num_compartments = 0;
+
 
   QVector<int> root_nodes;
   get_root_nodes(parent_nodes,&root_nodes);
@@ -76,9 +76,16 @@ int main(int argc, char *argv[])
 
   double total_volume = 0.0;
   double total_surface_area = 0.0;
-  double total_compartment_length = 0.0;
+
+  int num_compartments = 0;
+  double total_length = 0.0;
   double max_compartment_length = 0.0;
   double min_compartment_length =  std::numeric_limits<double>::max();
+
+  int num_segments = 0;
+  double max_segment_length = 0.0;
+  double min_segment_length =  std::numeric_limits<double>::max();
+
   //FROM ROOTS TO ALL IMMEDIATE BRANCHES.
   //THIS PART IGNORES TERMINAL-ROOTS
   for(int i=0; i < root_nodes.size();i++){
@@ -88,11 +95,14 @@ int main(int argc, char *argv[])
       vessel_node node1,node2;
       //If seed is a branch or terminal skip it
       if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
+          //TODO: You can list the number of seed/roots that are terminals.
           end = true;
+          continue;
         }
       double vol=0.0;
       double lsa = 0.0;
       double seg_len = 0.0;
+      double compartment_len = 0.0;
       while(!end) {
           copy_vnode(vessel_block.vessels[node1_num-1],&node1);
           node2_num = parent_nodes.indexOf(node1_num) + 1;
@@ -102,17 +112,21 @@ int main(int argc, char *argv[])
             }
           copy_vnode(vessel_block.vessels[node2_num-1],&node2);
 
-          calc_compartment_stats(&node1,&node2,&vol,&lsa,&seg_len);
+          calc_compartment_stats(&node1,&node2,&vol,&lsa,&compartment_len);
 
           total_volume+=vol;
           total_surface_area +=lsa;
-          total_compartment_length += seg_len;
-          if(seg_len > max_compartment_length) max_compartment_length = seg_len;
-          if(seg_len < min_compartment_length) min_compartment_length = seg_len;
+          total_length += compartment_len;
+          if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
+          if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
+          seg_len += compartment_len;
 
           node1_num = node2_num;
           num_compartments++;
         }
+      num_segments++;
+      if(seg_len > max_segment_length) max_segment_length = seg_len;
+      if(seg_len < min_segment_length) min_segment_length = seg_len;
       traversed_nodes.append(root_nodes[i]);
     }
   qDebug() << endl;
@@ -131,29 +145,35 @@ int main(int argc, char *argv[])
       foreach(int child_node, children){
           bool end = false;
           double seg_len = 0.0;
+          double compartment_len = 0.0;
           node1_num = child_node;
           num_compartments++;
           copy_vnode(vessel_block.vessels[child_node-1],&node1);
-          calc_compartment_stats(&node1,&branch_node,&vol,&lsa,&seg_len);
+          calc_compartment_stats(&node1,&branch_node,&vol,&lsa,&compartment_len);
+          seg_len += compartment_len;
           total_volume+=vol;
           total_surface_area +=lsa;
-          total_compartment_length += seg_len;
-          if(seg_len > max_compartment_length) max_compartment_length = seg_len;
-          if(seg_len < min_compartment_length) min_compartment_length = seg_len;
+          total_length += compartment_len;
+          if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
+          if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
           if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
               end = true;
+              num_segments++;
+              if(seg_len > max_segment_length) max_segment_length = seg_len;
+              if(seg_len < min_segment_length) min_segment_length = seg_len;
               continue;
             }
           while(!end) {
               num_compartments++;
               node2_num = parent_nodes.indexOf(node1_num) + 1;
               copy_vnode(vessel_block.vessels[node2_num-1],&node2);
-              calc_compartment_stats(&node1,&node2,&vol,&lsa,&seg_len);
+              calc_compartment_stats(&node1,&node2,&vol,&lsa,&compartment_len);
+              seg_len += compartment_len;
               total_volume+=vol;
               total_surface_area +=lsa;
-              total_compartment_length += seg_len;
-              if(seg_len > max_compartment_length) max_compartment_length = seg_len;
-              if(seg_len < min_compartment_length) min_compartment_length = seg_len;
+              total_length += compartment_len;
+              if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
+              if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
               if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
                   end = true;
                   continue;
@@ -161,6 +181,9 @@ int main(int argc, char *argv[])
               node1_num = node2_num;
               copy_vnode(vessel_block.vessels[node1_num-1],&node1);
             }
+          num_segments++;
+          if(seg_len > max_segment_length) max_segment_length = seg_len;
+          if(seg_len < min_segment_length) min_segment_length = seg_len;
         }
     }
 
@@ -168,18 +191,26 @@ int main(int argc, char *argv[])
   qDebug() << "Total Volume of Compartments:" << total_volume << " voxel cubic units";
   qDebug() << "Total LSA of Compartments:" << total_surface_area << "voxel square units";
 
-  double avg_seg_len = total_compartment_length/num_compartments;
+  double avg_compartment_len = total_length/num_compartments;
+  double avg_seg_len = total_length/num_segments;
 
   qDebug() << endl;
-  qDebug() << "Avg Compartment Length in structure" << avg_seg_len << "voxels";
+  qDebug() << "Avg Compartment Length in structure" << avg_compartment_len << "voxels";
   qDebug() << "Max Compartment Length in structure" << max_compartment_length << "voxels";
   qDebug() << "Min Compartment Length in structure" << min_compartment_length << "voxels";
 
   qDebug() << endl;
-  qDebug() << "Total Number of Compartment in Structure:" << num_compartments;
+  qDebug() << "Total Number of Compartments in Structure:" << num_compartments;
+  qDebug() << "Total Number of Segments in Structure:" << num_segments;
   qDebug() << "Total Number of Branches in Structure:" << num_branches;
   qDebug() << "Total Number of Root Nodes in Structure:" << root_nodes.size();
   qDebug() << "Total Number of Terminals in Structure:" << terminal_nodes.size();
+
+  qDebug() << endl;
+  qDebug() << "Total Length of structure" << total_length << "voxels";
+  qDebug() << "Avg Segment Length in structure" << avg_seg_len << "voxels";
+  qDebug() << "Max Segment Length in structure" << max_segment_length << "voxels";
+  qDebug() << "Min Segment Length in structure" << min_segment_length << "voxels";
 
   return EXIT_SUCCESS;
 }
