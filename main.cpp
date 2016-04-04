@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
           num_segments++;
           copy_vnode(vessel_block.vessels[node1_num-1],&node1);
           node2_num = parent_nodes.indexOf(node1_num) + 1;
-          if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
+          if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
               end = true;
               continue;
             }
@@ -249,7 +249,7 @@ int get_branches( QVector<int> parentNodes,QVector<int> *branch_nodes, QMap<int,
                       child.append(jj+1);
                     }
                 }
-              child.append(parentNodes.indexOf(curr_val));
+              child.append(parentNodes.indexOf(curr_val) + 1);
               child_map->insert(curr_val,child);
               child.clear();
               branch_count++;
@@ -293,7 +293,7 @@ bool read_swc_file(VesselBlock *vblock, QString inFileName) {
   while(!in.atEnd()){
       vessel_node node;
       QString line = in.readLine();
-      QStringList somelist = line.split(' ');
+      QStringList somelist = line.split(' ', QString::SkipEmptyParts);
       if( (line[0] != '#') && (!line.isEmpty())){
           //qDebug() << somelist;
           node.node_num = somelist[0].toInt();
