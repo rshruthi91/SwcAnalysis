@@ -118,7 +118,9 @@ int main(int argc, char *argv[])
           total_surface_area +=lsa;
           total_length += compartment_len;
           if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
-          if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
+          if( (compartment_len < min_compartment_length) && (compartment_len > 0)){
+              min_compartment_length = compartment_len;
+            }
           seg_len += compartment_len;
 
           node1_num = node2_num;
@@ -155,7 +157,9 @@ int main(int argc, char *argv[])
           total_surface_area +=lsa;
           total_length += compartment_len;
           if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
-          if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
+          if( (compartment_len < min_compartment_length) && (compartment_len > 0)){
+              min_compartment_length = compartment_len;
+            }
           if( (branch_nodes.indexOf(node1_num) >= 0) || (terminal_nodes.indexOf(node1_num) >= 0) ){
               end = true;
               num_segments++;
@@ -173,7 +177,9 @@ int main(int argc, char *argv[])
               total_surface_area +=lsa;
               total_length += compartment_len;
               if(compartment_len > max_compartment_length) max_compartment_length = compartment_len;
-              if(compartment_len < min_compartment_length) min_compartment_length = compartment_len;
+              if( (compartment_len < min_compartment_length) && (compartment_len > 0)){
+                  min_compartment_length = compartment_len;
+                }
               if( (branch_nodes.indexOf(node2_num) >= 0) || (terminal_nodes.indexOf(node2_num) >= 0) ){
                   end = true;
                   continue;
